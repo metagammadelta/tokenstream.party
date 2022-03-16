@@ -48,7 +48,7 @@ module.exports = {
       },
     },
     mainnet: {
-      url: "https://eth-mainnet.alchemyapi.io/v2/oKxs-03sij-U_N0iOlrSsZFr29-IqbuF", // <---- YOUR INFURA ID! (or it won't work)
+      url: "https://eth-mainnet.alchemyapi.io/v2/u-WB__GlHGH4e6XQR4M-aD5b9TtlZdMI", // <---- YOUR INFURA ID! (or it won't work)
       //      url: "https://speedy-nodes-nyc.moralis.io/XXXXXXXXXXXXXXXXXXXXXXXXX/eth/mainnet", // <---- YOUR MORALIS ID! (not limited to infura)
       gasPrice: mainnetGwei * 1000000000,
       accounts: {
