@@ -17,11 +17,25 @@ import { SimpleStreamABI } from "../contracts/external_ABI";
 import { useHistory } from "react-router";
 import { Link } from "react-router-dom";
 
+const STREAMS_CACHE_TTL_MILLIS=Number.parseInt(process.env.REACT_APP_STREAMS_CACHE_TTL_MILLIS) || 43200000; // 12h ttl by default
+// the actual cache
 const streamsCache = {};
 
+class CachedValue {
+  constructor(value) {
+    this.value = value;
+    this.updatedAt = Date.now();
+  }
+
+  isStale = () => {
+    return (this.updatedAt + STREAMS_CACHE_TTL_MILLIS) <= Date.now();
+  }
+}
+
 async function resolveStreamSummary(streamAddress, mainnetProvider) {
-  if (streamsCache[streamAddress]) {
-    return streamsCache[streamAddress];
+  const cachedStream = streamsCache[streamAddress];
+  if (cachedStream && cachedStream instanceof CachedValue && !cachedStream.isStale()) {
+    return cachedStream.value;
   }
 
   var contract = new ethers.Contract(
@@ -48,7 +62,7 @@ async function resolveStreamSummary(streamAddress, mainnetProvider) {
         ((Number(result._hex) * 0.000000000000000001) / data.cap) * 100)
     );
 
-  streamsCache[streamAddress] = data;
+  streamsCache[streamAddress] = new CachedValue(data);
   return data;
 }
 
@@ -70,21 +84,33 @@ export default function Home({
 
   const [sData, setData] = useState([]);
 
-  useEffect(async () => {
-    // parallely load all available streams data
-    Promise.all(
-      streams.map(async (stream) => {
-        const summary = await resolveStreamSummary(stream.stream, mainnetProvider);
-        return {...stream, 3: summary.cap, percent: summary.percent};
-      })
-    ).then(results => {
-      setData(results);
+  useEffect(() => {
+    let shouldCancel = false;
+    const fetchStreams = async () => {
+      // parallely load all available streams data
+      Promise.all(
+        streams.map(async (stream) => {
+          const summary = await resolveStreamSummary(stream.stream, mainnetProvider);
+          return { ...stream, 3: summary.cap, percent: summary.percent };
+        })
+      ).then(results => {
+        // process promised streams only when this effect call is not cancelled.
+        if (!shouldCancel) {
+          setData(results);
 
-      // Wait until list is almost fully loaded to render
-      if (results.length >= 18) {
-        setReady(true);
-      }
-    });
+          // Wait until list is almost fully loaded to render
+          if (results.length >= 18) {
+            setReady(true);
+          }
+        }
+      });
+    }
+
+    fetchStreams()
+      .catch(console.error);
+
+    // cleanup callback
+    return () => shouldCancel = true;
   }, [streams]);
 
   const createNewStream = async () => {
